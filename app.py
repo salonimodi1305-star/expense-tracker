@@ -1,6 +1,5 @@
 import streamlit as st
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import pandas as pd
 import os
 from datetime import datetime, date
@@ -38,15 +37,6 @@ def save(data):
 
 # ── Constants ──────────────────────────────────────────────────
 CATS    = ["Food","Transport","Shopping","Health","Entertainment","Utilities","Other"]
-COLORS  = ["#E07B39","#3266AD","#7B62C2","#C25454","#3A9FC4","#5A9E6F","#A07850"]
-BUDGETS = {"Food":8000,"Transport":4000,"Shopping":5000,"Health":3000,
-           "Entertainment":3000,"Utilities":2000,"Other":2000}
-MONTHS  = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-
-GREEN  = "#2A7A4B"
-RED    = "#B83232"
-BLUE   = "#2D5FA8"
-ORANGE = "#C07010"
 
 # ── Helpers ────────────────────────────────────────────────────
 def fmt(n):
@@ -54,19 +44,6 @@ def fmt(n):
 
 def cur_ym():
     return date.today().strftime("%Y-%m")
-
-def ym_label(ym):
-    y, m = ym.split("-")
-    return "{} {}".format(MONTHS[int(m)-1], y)
-
-def last6():
-    y, m = date.today().year, date.today().month
-    out = []
-    for _ in range(6):
-        out.insert(0, "{}-{:02d}".format(y, m))
-        m -= 1
-        if m == 0: m, y = 12, y-1
-    return out
 
 # ── Session State ──────────────────────────────────────────────
 if "db" not in st.session_state:
@@ -83,7 +60,8 @@ page = st.sidebar.radio(
     label_visibility="collapsed"
 )
 
-cur   = cur_ym()
+# ── Dashboard Data ─────────────────────────────────────────────
+cur = cur_ym()
 m_exp = [e for e in db["expenses"] if str(e["date"]).startswith(cur)]
 m_sal = [s for s in db["salaries"] if str(s["month"]) == cur]
 
@@ -115,7 +93,9 @@ elif page == "💸 Expenses":
             "date": date.today().strftime("%Y-%m-%d")
         })
         save(db)
-        st.success("Expense Saved!")
+
+        st.success("Expense Saved! ✅")
+        st.rerun()   # 🔥 FIX: refresh app instantly
 
     if db["expenses"]:
         st.dataframe(pd.DataFrame(db["expenses"]))
@@ -134,13 +114,51 @@ elif page == "💼 Salary":
             "amount": float(amount)
         })
         save(db)
-        st.success("Salary Saved!")
+
+        st.success("Salary Saved! ✅")
+        st.rerun()   # 🔥 refresh
 
     if db["salaries"]:
         st.dataframe(pd.DataFrame(db["salaries"]))
 
-# ── Charts (basic placeholder, original charts can stay same) ──
+# ── Charts ─────────────────────────────────────────────────────
 elif page == "📈 Charts":
     st.title("📈 Charts")
-    st.info("Charts working with saved CSV data")
- 
+
+    # 🔥 IMPORTANT: Reload latest data
+    db = load()
+
+    if not db["expenses"]:
+        st.warning("No expense data available")
+    else:
+        df = pd.DataFrame(db["expenses"])
+
+        # Fix data types
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+
+        # ── CATEGORY BAR CHART ─────────────────────
+        st.subheader("Category-wise Expenses")
+
+        cat_data = df.groupby("cat")["amount"].sum()
+        st.bar_chart(cat_data)
+
+        # ── PIE CHART ──────────────────────────────
+        st.subheader("Expense Distribution")
+
+        fig1, ax1 = plt.subplots()
+        ax1.pie(cat_data, labels=cat_data.index, autopct="%1.1f%%")
+        ax1.axis("equal")
+        st.pyplot(fig1)
+
+        # ── MONTHLY TREND ──────────────────────────
+        st.subheader("Monthly Expense Trend")
+
+        df["date"] = pd.to_datetime(df["date"])
+        df["month"] = df["date"].dt.to_period("M").astype(str)
+
+        month_data = df.groupby("month")["amount"].sum()
+
+        fig2, ax2 = plt.subplots()
+        month_data.plot(kind="line", marker="o", ax=ax2)
+
+        st.pyplot(fig2)
