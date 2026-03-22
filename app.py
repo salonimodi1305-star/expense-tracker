@@ -25,17 +25,12 @@ def save(data):
     pd.DataFrame(data["users"]).to_csv(USER_FILE, index=False)
 
 # ── INIT SESSION ───────────────────────────────────────────
-if "db" not in st.session_state:
-    st.session_state.db = load()
-
 if "user" not in st.session_state:
     st.session_state.user = None
 
-db = st.session_state.db
-
 # ── HELPERS ────────────────────────────────────────────────
 def fmt(n):
-    return "₹{:,}".format(int(round(abs(n))))
+    return "₹{:,}".format(int(round(n))) if n else "₹0"
 
 def cur_ym():
     return date.today().strftime("%Y-%m")
@@ -44,11 +39,11 @@ CATS = ["Food", "Transport", "Shopping", "Health", "Entertainment", "Utilities",
 
 # ── AUTH SYSTEM ────────────────────────────────────────────
 def login_page():
+    db = load()
     st.title("🔐 Login / Signup")
 
     tab1, tab2 = st.tabs(["Login", "Signup"])
 
-    # LOGIN
     with tab1:
         u = st.text_input("Username")
         p = st.text_input("Password", type="password")
@@ -62,7 +57,6 @@ def login_page():
             else:
                 st.error("Invalid credentials")
 
-    # SIGNUP
     with tab2:
         new_u = st.text_input("New Username")
         new_p = st.text_input("New Password", type="password")
@@ -75,26 +69,31 @@ def login_page():
                 save(db)
                 st.success("Account created! Now login.")
 
-# ── IF NOT LOGGED IN ───────────────────────────────────────
+# ── LOGIN CHECK ────────────────────────────────────────────
 if not st.session_state.user:
     login_page()
     st.stop()
 
 # ── SIDEBAR ────────────────────────────────────────────────
 st.sidebar.title(f"👋 {st.session_state.user}")
+
 if st.sidebar.button("Logout"):
     st.session_state.user = None
     st.rerun()
 
 page = st.sidebar.radio("Navigate", ["📊 Dashboard", "💸 Expenses", "💼 Salary", "📈 Charts"])
 
+# ── ALWAYS LOAD FRESH DATA (🔥 FIX)
+db = load()
+
 # ── DASHBOARD DATA ─────────────────────────────────────────
 cur = cur_ym()
-m_exp = [e for e in db["expenses"] if str(e["date"]).startswith(cur)]
-m_sal = [s for s in db["salaries"] if str(s["month"]) == cur]
 
-income = sum(float(s["amount"]) for s in m_sal)
-spent = sum(float(e["amount"]) for e in m_exp)
+m_exp = [e for e in db["expenses"] if str(e.get("date", "")).startswith(cur)]
+m_sal = [s for s in db["salaries"] if str(s.get("month", "")) == cur]
+
+income = sum(float(s.get("amount", 0)) for s in m_sal)
+spent = sum(float(e.get("amount", 0)) for e in m_exp)
 saving = income - spent
 
 # ── DASHBOARD ──────────────────────────────────────────────
@@ -110,8 +109,6 @@ if page == "📊 Dashboard":
 elif page == "💸 Expenses":
     st.title("💸 Expenses")
 
-    # ADD
-    st.subheader("➕ Add Expense")
     name = st.text_input("Description")
     amount = st.number_input("Amount", min_value=0.0)
     category = st.selectbox("Category", CATS)
@@ -128,22 +125,19 @@ elif page == "💸 Expenses":
         st.success("Added ✅")
         st.rerun()
 
-    # DISPLAY
     if db["expenses"]:
         df = pd.DataFrame(db["expenses"])
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df)
 
         # EDIT
-        st.subheader("✏ Edit Expense")
-        edit_id = st.selectbox("Select ID", df["id"])
-
+        edit_id = st.selectbox("Edit ID", df["id"])
         exp = next(e for e in db["expenses"] if e["id"] == edit_id)
 
-        new_name = st.text_input("Edit Name", value=exp["name"])
-        new_amount = st.number_input("Edit Amount", value=float(exp["amount"]))
-        new_cat = st.selectbox("Edit Category", CATS, index=CATS.index(exp["cat"]))
+        new_name = st.text_input("Name", exp["name"])
+        new_amount = st.number_input("Amount", value=float(exp["amount"]))
+        new_cat = st.selectbox("Category", CATS, index=CATS.index(exp["cat"]))
 
-        if st.button("Update Expense"):
+        if st.button("Update"):
             exp["name"] = new_name
             exp["amount"] = new_amount
             exp["cat"] = new_cat
@@ -152,22 +146,12 @@ elif page == "💸 Expenses":
             st.rerun()
 
         # DELETE
-        st.subheader("🗑 Delete Expense")
-        del_id = st.selectbox("Delete ID", df["id"], key="delete")
-
-        if st.button("Delete Expense"):
+        del_id = st.selectbox("Delete ID", df["id"], key="del")
+        if st.button("Delete"):
             db["expenses"] = [e for e in db["expenses"] if e["id"] != del_id]
             save(db)
             st.success("Deleted ✅")
             st.rerun()
-
-        # DOWNLOAD
-        st.download_button(
-            "⬇ Download CSV",
-            data=pd.DataFrame(db["expenses"]).to_csv(index=False),
-            file_name="expenses.csv",
-            mime="text/csv"
-        )
 
 # ── SALARY ─────────────────────────────────────────────────
 elif page == "💼 Salary":
@@ -187,13 +171,11 @@ elif page == "💼 Salary":
         st.rerun()
 
     if db["salaries"]:
-        st.dataframe(pd.DataFrame(db["salaries"]), use_container_width=True)
+        st.dataframe(pd.DataFrame(db["salaries"]))
 
 # ── CHARTS ─────────────────────────────────────────────────
 elif page == "📈 Charts":
     st.title("📈 Charts")
-
-    db = load()
 
     if not db["expenses"]:
         st.warning("No data")
@@ -201,21 +183,4 @@ elif page == "📈 Charts":
         df = pd.DataFrame(db["expenses"])
         df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
 
-        st.subheader("Category-wise")
         st.bar_chart(df.groupby("cat")["amount"].sum())
-
-        st.subheader("Distribution")
-        fig1, ax1 = plt.subplots()
-        cat = df.groupby("cat")["amount"].sum()
-        ax1.pie(cat, labels=cat.index, autopct="%1.1f%%")
-        ax1.axis("equal")
-        st.pyplot(fig1)
-
-        st.subheader("Monthly Trend")
-        df["date"] = pd.to_datetime(df["date"])
-        df["month"] = df["date"].dt.to_period("M").astype(str)
-        month = df.groupby("month")["amount"].sum()
-
-        fig2, ax2 = plt.subplots()
-        month.plot(marker="o", ax=ax2)
-        st.pyplot(fig2)
