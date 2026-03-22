@@ -4,13 +4,55 @@ import pandas as pd
 import os
 from datetime import datetime, date
 
+# ── PAGE STYLE (🔥 NEW UI) ─────────────────────────────────
+st.set_page_config(page_title="Finance Tracker", page_icon="💰", layout="wide")
+
+st.markdown("""
+<style>
+/* Background */
+.stApp {
+    background: linear-gradient(to right, #e3f2fd, #fce4ec);
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: linear-gradient(to bottom, #1e3c72, #2a5298);
+    color: white;
+}
+
+/* Cards */
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+/* Buttons */
+.stButton>button {
+    background-color: #2a5298;
+    color: white;
+    border-radius: 10px;
+    padding: 8px 16px;
+    border: none;
+}
+.stButton>button:hover {
+    background-color: #1e3c72;
+    color: white;
+}
+
+/* Titles */
+h1, h2, h3 {
+    color: #1e3c72;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ── FILE PATHS ─────────────────────────────────────────────
 EXP_FILE = "expenses.csv"
 SAL_FILE = "salaries.csv"
 USER_FILE = "users.csv"
-
-# ── PAGE CONFIG ────────────────────────────────────────────
-st.set_page_config(page_title="Finance Tracker", page_icon="💰", layout="wide")
 
 # ── LOAD / SAVE ────────────────────────────────────────────
 def load():
@@ -24,7 +66,7 @@ def save(data):
     pd.DataFrame(data["salaries"]).to_csv(SAL_FILE, index=False)
     pd.DataFrame(data["users"]).to_csv(USER_FILE, index=False)
 
-# ── INIT SESSION ───────────────────────────────────────────
+# ── SESSION ────────────────────────────────────────────────
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -37,7 +79,7 @@ def cur_ym():
 
 CATS = ["Food", "Transport", "Shopping", "Health", "Entertainment", "Utilities", "Other"]
 
-# ── AUTH SYSTEM ────────────────────────────────────────────
+# ── LOGIN ──────────────────────────────────────────────────
 def login_page():
     db = load()
     st.title("🔐 Login / Signup")
@@ -83,12 +125,10 @@ if st.sidebar.button("Logout"):
 
 page = st.sidebar.radio("Navigate", ["📊 Dashboard", "💸 Expenses", "💼 Salary", "📈 Charts"])
 
-# ── ALWAYS LOAD FRESH DATA (🔥 FIX)
+# ── LOAD DATA ──────────────────────────────────────────────
 db = load()
 
-# ── DASHBOARD DATA ─────────────────────────────────────────
 cur = cur_ym()
-
 m_exp = [e for e in db["expenses"] if str(e.get("date", "")).startswith(cur)]
 m_sal = [s for s in db["salaries"] if str(s.get("month", "")) == cur]
 
@@ -100,10 +140,11 @@ saving = income - spent
 if page == "📊 Dashboard":
     st.title("📊 Dashboard")
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Income", fmt(income))
-    c2.metric("Expenses", fmt(spent))
-    c3.metric("Savings", fmt(saving))
+    col1, col2, col3 = st.columns(3)
+
+    col1.markdown(f'<div class="card"><h3>Income</h3><h2>{fmt(income)}</h2></div>', unsafe_allow_html=True)
+    col2.markdown(f'<div class="card"><h3>Expenses</h3><h2>{fmt(spent)}</h2></div>', unsafe_allow_html=True)
+    col3.markdown(f'<div class="card"><h3>Savings</h3><h2>{fmt(saving)}</h2></div>', unsafe_allow_html=True)
 
 # ── EXPENSES ───────────────────────────────────────────────
 elif page == "💸 Expenses":
@@ -129,7 +170,7 @@ elif page == "💸 Expenses":
         df = pd.DataFrame(db["expenses"])
         st.dataframe(df)
 
-        # EDIT
+        st.subheader("✏ Edit Expense")
         edit_id = st.selectbox("Edit ID", df["id"])
         exp = next(e for e in db["expenses"] if e["id"] == edit_id)
 
@@ -145,8 +186,9 @@ elif page == "💸 Expenses":
             st.success("Updated ✅")
             st.rerun()
 
-        # DELETE
+        st.subheader("🗑 Delete Expense")
         del_id = st.selectbox("Delete ID", df["id"], key="del")
+
         if st.button("Delete"):
             db["expenses"] = [e for e in db["expenses"] if e["id"] != del_id]
             save(db)
