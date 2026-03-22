@@ -4,7 +4,64 @@ import os
 from datetime import datetime, date
 
 # ── CONFIG ────────────────────────────────────────────────
-st.set_page_config(page_title="Finance Tracker Pro", layout="wide")
+st.set_page_config(page_title="Finance Tracker Pro 💰", layout="wide")
+
+# ── 🎨 NEW GRAPHICAL UI ───────────────────────────────────
+st.markdown("""
+<style>
+
+/* 🌈 BACKGROUND */
+.stApp {
+    background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+    background-attachment: fixed;
+}
+
+/* ✨ EMOJI BACKGROUND */
+.stApp::before {
+    content: "💰 📊 💸 📈 💵 💳 🪙 💼";
+    position: fixed;
+    font-size: 70px;
+    opacity: 0.07;
+    top: 25%;
+    left: 10%;
+    transform: rotate(-15deg);
+}
+
+/* SIDEBAR */
+[data-testid="stSidebar"] {
+    background: linear-gradient(to bottom, #141e30, #243b55);
+    color: white;
+}
+
+/* ✨ METRIC CARDS */
+[data-testid="metric-container"] {
+    background: rgba(255,255,255,0.75);
+    padding: 18px;
+    border-radius: 15px;
+    box-shadow: 0px 4px 15px rgba(0,0,0,0.15);
+}
+
+/* BUTTONS */
+.stButton>button {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-radius: 12px;
+    font-weight: bold;
+}
+
+/* TABLE */
+.stDataFrame {
+    background: rgba(255,255,255,0.85);
+    border-radius: 10px;
+}
+
+/* HEADINGS */
+h1, h2, h3 {
+    color: #1f2a44;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # ── FILES ────────────────────────────────────────────────
 EXP_FILE = "expenses.csv"
@@ -59,9 +116,9 @@ CATS = ["Food","Transport","Shopping","Health","Entertainment","Utilities","Othe
 # ── LOGIN ────────────────────────────────────────────────
 def login():
     db = load()
-    st.title("🔐 Login / Signup")
+    st.title("🔐 Login / Signup 💼")
 
-    tab1, tab2 = st.tabs(["Login","Signup"])
+    tab1, tab2 = st.tabs(["🔑 Login","🆕 Signup"])
 
     with tab1:
         u = st.text_input("Username")
@@ -87,24 +144,23 @@ if not st.session_state.user:
     st.stop()
 
 # ── SIDEBAR ──────────────────────────────────────────────
-st.sidebar.title(f"👋 {st.session_state.user}")
+st.sidebar.title(f"👋 Welcome {st.session_state.user} 💰")
 
-if st.sidebar.button("Logout"):
+if st.sidebar.button("🚪 Logout"):
     st.session_state.user = None
     st.rerun()
 
-page = st.sidebar.radio("Menu",["📊 Dashboard","💸 Expenses","💼 Salary","📈 Analytics"])
+page = st.sidebar.radio("📌 Menu",["📊 Dashboard","💸 Expenses","💼 Salary","📈 Analytics"])
 
 # ── LOAD DATA ────────────────────────────────────────────
 db = load()
 
-# ── DASHBOARD (🔥 FIXED) ─────────────────────────────────
+# ── DASHBOARD ────────────────────────────────────────────
 if page=="📊 Dashboard":
-    st.title("📊 Dashboard")
+    st.title("📊 Finance Dashboard 💰✨")
 
     cur = cur_month()
 
-    # SAFE FILTERING
     df_exp = pd.DataFrame(db["expenses"])
     df_sal = pd.DataFrame(db["salaries"])
 
@@ -120,30 +176,27 @@ if page=="📊 Dashboard":
     saving = income - spent
 
     col1,col2,col3 = st.columns(3)
+    col1.metric("💰 Income", fmt(income))
+    col2.metric("💸 Expenses", fmt(spent))
+    col3.metric("💎 Savings", fmt(saving))
 
-    col1.metric("Income", fmt(income))
-    col2.metric("Expenses", fmt(spent))
-    col3.metric("Savings", fmt(saving))
-
-    # 🎯 Budget
-    budget = st.number_input("Set Monthly Budget", value=5000)
+    st.subheader("🎯 Monthly Budget")
+    budget = st.number_input("Set Budget", value=5000)
 
     if spent > budget:
         st.error("⚠ Budget Exceeded!")
     else:
         st.success(f"Remaining: {fmt(budget-spent)}")
 
-# ── EXPENSE CRUD ─────────────────────────────────────────
+# ── EXPENSES ─────────────────────────────────────────────
 elif page=="💸 Expenses":
-    st.title("💸 Expenses")
+    st.title("💸 Expense Manager")
 
-    # CREATE
-    st.subheader("➕ Add Expense")
-    name = st.text_input("Name")
+    name = st.text_input("Description")
     amt = st.number_input("Amount",min_value=0.0)
     cat = st.selectbox("Category",CATS)
 
-    if st.button("Add Expense"):
+    if st.button("➕ Add Expense"):
         db["expenses"].append({
             "id":int(datetime.now().timestamp()*1000),
             "name":name,
@@ -160,7 +213,6 @@ elif page=="💸 Expenses":
     if not df.empty:
         st.dataframe(df)
 
-        # UPDATE
         st.subheader("✏ Edit Expense")
         eid = st.selectbox("Select ID", df["id"])
         exp = next(e for e in db["expenses"] if e["id"]==eid)
@@ -177,7 +229,6 @@ elif page=="💸 Expenses":
             st.success("Updated")
             st.rerun()
 
-        # DELETE
         st.subheader("🗑 Delete Expense")
         did = st.selectbox("Delete ID", df["id"], key="del")
 
@@ -187,15 +238,14 @@ elif page=="💸 Expenses":
             st.success("Deleted")
             st.rerun()
 
-# ── SALARY CRUD ──────────────────────────────────────────
+# ── SALARY ───────────────────────────────────────────────
 elif page=="💼 Salary":
-    st.title("💼 Salary")
+    st.title("💼 Salary Manager")
 
-    # CREATE
     month = st.text_input("Month", value=cur_month())
     amt = st.number_input("Amount", min_value=0.0)
 
-    if st.button("Add Salary"):
+    if st.button("➕ Add Salary"):
         db["salaries"].append({
             "id":int(datetime.now().timestamp()*1000),
             "month":month,
@@ -210,7 +260,6 @@ elif page=="💼 Salary":
     if not df.empty:
         st.dataframe(df)
 
-        # UPDATE
         sid = st.selectbox("Edit Salary ID", df["id"])
         sal = next(s for s in db["salaries"] if s["id"]==sid)
 
@@ -222,7 +271,6 @@ elif page=="💼 Salary":
             st.success("Updated")
             st.rerun()
 
-        # DELETE
         did = st.selectbox("Delete Salary ID", df["id"], key="sdel")
 
         if st.button("Delete Salary"):
@@ -233,7 +281,7 @@ elif page=="💼 Salary":
 
 # ── ANALYTICS ────────────────────────────────────────────
 elif page=="📈 Analytics":
-    st.title("📈 Analytics")
+    st.title("📈 Analytics Dashboard")
 
     df = pd.DataFrame(db["expenses"])
 
@@ -243,8 +291,8 @@ elif page=="📈 Analytics":
         df["date"] = pd.to_datetime(df["date"])
         df["month"] = df["date"].dt.to_period("M")
 
-        st.subheader("Monthly Trend")
+        st.subheader("📊 Monthly Trend")
         st.line_chart(df.groupby("month")["amount"].sum())
 
-        st.subheader("Category Breakdown")
+        st.subheader("📊 Category Breakdown")
         st.bar_chart(df.groupby("cat")["amount"].sum())
