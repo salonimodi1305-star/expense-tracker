@@ -1,228 +1,221 @@
 import streamlit as st
-import matplotlib.pyplot as plt
 import pandas as pd
 import os
 from datetime import datetime, date
 
-# ── PAGE STYLE (🔥 NEW UI) ─────────────────────────────────
-st.set_page_config(page_title="Finance Tracker", page_icon="💰", layout="wide")
+# ── PAGE CONFIG ─────────────────────────────────────────────
+st.set_page_config(page_title="Finance Tracker Pro 💰", layout="wide")
 
+# ── 🎨 MODERN UI ────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Background */
 .stApp {
-    background: linear-gradient(to right, #e3f2fd, #fce4ec);
+    background: linear-gradient(to right, #dfe9f3, #ffffff);
 }
 
 /* Sidebar */
 [data-testid="stSidebar"] {
-    background: linear-gradient(to bottom, #1e3c72, #2a5298);
+    background: linear-gradient(to bottom, #141e30, #243b55);
     color: white;
 }
 
 /* Cards */
 .card {
-    background: white;
-    padding: 20px;
-    border-radius: 15px;
-    box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+    padding: 25px;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #ffffff, #f0f0f0);
+    box-shadow: 8px 8px 20px #d1d1d1, -8px -8px 20px #ffffff;
     text-align: center;
 }
 
 /* Buttons */
 .stButton>button {
-    background-color: #2a5298;
+    background: #243b55;
     color: white;
     border-radius: 10px;
-    padding: 8px 16px;
-    border: none;
-}
-.stButton>button:hover {
-    background-color: #1e3c72;
-    color: white;
-}
-
-/* Titles */
-h1, h2, h3 {
-    color: #1e3c72;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ── FILE PATHS ─────────────────────────────────────────────
+# ── FILES ──────────────────────────────────────────────────
 EXP_FILE = "expenses.csv"
 SAL_FILE = "salaries.csv"
 USER_FILE = "users.csv"
 
-# ── LOAD / SAVE ────────────────────────────────────────────
-def load():
-    expenses = pd.read_csv(EXP_FILE).to_dict("records") if os.path.exists(EXP_FILE) else []
-    salaries = pd.read_csv(SAL_FILE).to_dict("records") if os.path.exists(SAL_FILE) else []
-    users = pd.read_csv(USER_FILE).to_dict("records") if os.path.exists(USER_FILE) else []
-    return {"expenses": expenses, "salaries": salaries, "users": users}
+# ── INIT FILES ─────────────────────────────────────────────
+def init_files():
+    if not os.path.exists(EXP_FILE):
+        pd.DataFrame(columns=["id","name","amount","cat","date"]).to_csv(EXP_FILE,index=False)
+    if not os.path.exists(SAL_FILE):
+        pd.DataFrame(columns=["id","month","amount"]).to_csv(SAL_FILE,index=False)
+    if not os.path.exists(USER_FILE):
+        pd.DataFrame(columns=["username","password"]).to_csv(USER_FILE,index=False)
 
-def save(data):
-    pd.DataFrame(data["expenses"]).to_csv(EXP_FILE, index=False)
-    pd.DataFrame(data["salaries"]).to_csv(SAL_FILE, index=False)
-    pd.DataFrame(data["users"]).to_csv(USER_FILE, index=False)
+init_files()
+
+# ── SAFE LOAD ──────────────────────────────────────────────
+def safe_read(file):
+    if os.path.exists(file) and os.path.getsize(file) > 0:
+        try:
+            return pd.read_csv(file).to_dict("records")
+        except:
+            return []
+    return []
+
+def load():
+    return {
+        "expenses": safe_read(EXP_FILE),
+        "salaries": safe_read(SAL_FILE),
+        "users": safe_read(USER_FILE)
+    }
+
+def save(db):
+    pd.DataFrame(db["expenses"]).to_csv(EXP_FILE,index=False)
+    pd.DataFrame(db["salaries"]).to_csv(SAL_FILE,index=False)
+    pd.DataFrame(db["users"]).to_csv(USER_FILE,index=False)
 
 # ── SESSION ────────────────────────────────────────────────
 if "user" not in st.session_state:
     st.session_state.user = None
 
 # ── HELPERS ────────────────────────────────────────────────
-def fmt(n):
-    return "₹{:,}".format(int(round(n))) if n else "₹0"
+def fmt(x):
+    return f"₹{int(x):,}" if x else "₹0"
 
-def cur_ym():
+def cur_month():
     return date.today().strftime("%Y-%m")
 
-CATS = ["Food", "Transport", "Shopping", "Health", "Entertainment", "Utilities", "Other"]
+CATS = ["Food","Transport","Shopping","Health","Entertainment","Utilities","Other"]
 
 # ── LOGIN ──────────────────────────────────────────────────
-def login_page():
+def login():
     db = load()
     st.title("🔐 Login / Signup")
 
-    tab1, tab2 = st.tabs(["Login", "Signup"])
+    tab1, tab2 = st.tabs(["Login","Signup"])
 
     with tab1:
         u = st.text_input("Username")
         p = st.text_input("Password", type="password")
-
         if st.button("Login"):
-            user = next((x for x in db["users"] if x["username"] == u and x["password"] == p), None)
+            user = next((x for x in db["users"] if x["username"]==u and x["password"]==p),None)
             if user:
                 st.session_state.user = u
-                st.success("Login successful ✅")
                 st.rerun()
             else:
                 st.error("Invalid credentials")
 
     with tab2:
-        new_u = st.text_input("New Username")
-        new_p = st.text_input("New Password", type="password")
-
+        u = st.text_input("New Username")
+        p = st.text_input("New Password", type="password")
         if st.button("Signup"):
-            if any(x["username"] == new_u for x in db["users"]):
-                st.warning("User already exists")
-            else:
-                db["users"].append({"username": new_u, "password": new_p})
-                save(db)
-                st.success("Account created! Now login.")
+            db["users"].append({"username":u,"password":p})
+            save(db)
+            st.success("Account created!")
 
-# ── LOGIN CHECK ────────────────────────────────────────────
 if not st.session_state.user:
-    login_page()
+    login()
     st.stop()
 
 # ── SIDEBAR ────────────────────────────────────────────────
 st.sidebar.title(f"👋 {st.session_state.user}")
 
 if st.sidebar.button("Logout"):
-    st.session_state.user = None
+    st.session_state.user=None
     st.rerun()
 
-page = st.sidebar.radio("Navigate", ["📊 Dashboard", "💸 Expenses", "💼 Salary", "📈 Charts"])
+page = st.sidebar.radio("Menu",["📊 Dashboard","💸 Expenses","💼 Salary","📈 Analytics"])
 
 # ── LOAD DATA ──────────────────────────────────────────────
 db = load()
 
-cur = cur_ym()
-m_exp = [e for e in db["expenses"] if str(e.get("date", "")).startswith(cur)]
-m_sal = [s for s in db["salaries"] if str(s.get("month", "")) == cur]
-
-income = sum(float(s.get("amount", 0)) for s in m_sal)
-spent = sum(float(e.get("amount", 0)) for e in m_exp)
-saving = income - spent
-
 # ── DASHBOARD ──────────────────────────────────────────────
-if page == "📊 Dashboard":
+if page=="📊 Dashboard":
     st.title("📊 Dashboard")
 
-    col1, col2, col3 = st.columns(3)
+    cur = cur_month()
 
-    col1.markdown(f'<div class="card"><h3>Income</h3><h2>{fmt(income)}</h2></div>', unsafe_allow_html=True)
-    col2.markdown(f'<div class="card"><h3>Expenses</h3><h2>{fmt(spent)}</h2></div>', unsafe_allow_html=True)
-    col3.markdown(f'<div class="card"><h3>Savings</h3><h2>{fmt(saving)}</h2></div>', unsafe_allow_html=True)
+    m_exp = [e for e in db["expenses"] if str(e["date"]).startswith(cur)]
+    m_sal = [s for s in db["salaries"] if s["month"]==cur]
+
+    income = sum(float(s["amount"]) for s in m_sal)
+    spent = sum(float(e["amount"]) for e in m_exp)
+    saving = income - spent
+
+    col1,col2,col3 = st.columns(3)
+
+    col1.markdown(f"<div class='card'><h3>Income</h3><h2>{fmt(income)}</h2></div>",unsafe_allow_html=True)
+    col2.markdown(f"<div class='card'><h3>Expense</h3><h2>{fmt(spent)}</h2></div>",unsafe_allow_html=True)
+    col3.markdown(f"<div class='card'><h3>Saving</h3><h2>{fmt(saving)}</h2></div>",unsafe_allow_html=True)
+
+    # 🎯 Budget Feature
+    st.subheader("🎯 Monthly Budget")
+    budget = st.number_input("Set Budget", value=5000)
+
+    if spent > budget:
+        st.error("⚠ Budget exceeded!")
+    else:
+        st.success(f"Remaining: {fmt(budget-spent)}")
 
 # ── EXPENSES ───────────────────────────────────────────────
-elif page == "💸 Expenses":
-    st.title("💸 Expenses")
+elif page=="💸 Expenses":
+    st.title("💸 Add Expense")
 
     name = st.text_input("Description")
-    amount = st.number_input("Amount", min_value=0.0)
-    category = st.selectbox("Category", CATS)
+    amt = st.number_input("Amount",min_value=0.0)
+    cat = st.selectbox("Category",CATS)
 
-    if st.button("Add Expense"):
+    if st.button("Add"):
         db["expenses"].append({
-            "id": int(datetime.now().timestamp()*1000),
-            "name": name,
-            "amount": float(amount),
-            "cat": category,
-            "date": date.today().strftime("%Y-%m-%d")
+            "id":int(datetime.now().timestamp()*1000),
+            "name":name,
+            "amount":amt,
+            "cat":cat,
+            "date":date.today().strftime("%Y-%m-%d")
         })
         save(db)
-        st.success("Added ✅")
+        st.success("Added")
         st.rerun()
 
     if db["expenses"]:
-        df = pd.DataFrame(db["expenses"])
-        st.dataframe(df)
-
-        st.subheader("✏ Edit Expense")
-        edit_id = st.selectbox("Edit ID", df["id"])
-        exp = next(e for e in db["expenses"] if e["id"] == edit_id)
-
-        new_name = st.text_input("Name", exp["name"])
-        new_amount = st.number_input("Amount", value=float(exp["amount"]))
-        new_cat = st.selectbox("Category", CATS, index=CATS.index(exp["cat"]))
-
-        if st.button("Update"):
-            exp["name"] = new_name
-            exp["amount"] = new_amount
-            exp["cat"] = new_cat
-            save(db)
-            st.success("Updated ✅")
-            st.rerun()
-
-        st.subheader("🗑 Delete Expense")
-        del_id = st.selectbox("Delete ID", df["id"], key="del")
-
-        if st.button("Delete"):
-            db["expenses"] = [e for e in db["expenses"] if e["id"] != del_id]
-            save(db)
-            st.success("Deleted ✅")
-            st.rerun()
+        st.dataframe(pd.DataFrame(db["expenses"]))
 
 # ── SALARY ─────────────────────────────────────────────────
-elif page == "💼 Salary":
+elif page=="💼 Salary":
     st.title("💼 Salary")
 
-    month = st.text_input("Month (YYYY-MM)", value=cur_ym())
-    amount = st.number_input("Salary", min_value=0.0)
+    m = st.text_input("Month",value=cur_month())
+    amt = st.number_input("Amount",min_value=0.0)
 
-    if st.button("Save Salary"):
+    if st.button("Save"):
         db["salaries"].append({
-            "id": int(datetime.now().timestamp()*1000),
-            "month": month,
-            "amount": float(amount)
+            "id":int(datetime.now().timestamp()*1000),
+            "month":m,
+            "amount":amt
         })
         save(db)
-        st.success("Saved ✅")
+        st.success("Saved")
         st.rerun()
 
-    if db["salaries"]:
-        st.dataframe(pd.DataFrame(db["salaries"]))
+    st.dataframe(pd.DataFrame(db["salaries"]))
 
-# ── CHARTS ─────────────────────────────────────────────────
-elif page == "📈 Charts":
-    st.title("📈 Charts")
+# ── 📈 ANALYTICS ───────────────────────────────────────────
+elif page=="📈 Analytics":
+    st.title("📈 Analytics")
 
     if not db["expenses"]:
-        st.warning("No data")
+        st.warning("No data available")
     else:
         df = pd.DataFrame(db["expenses"])
-        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+        df["date"] = pd.to_datetime(df["date"])
+        df["month"] = df["date"].dt.to_period("M")
 
-        st.bar_chart(df.groupby("cat")["amount"].sum())
+        # 📊 Monthly Trend
+        st.subheader("📊 Monthly Trend")
+        trend = df.groupby("month")["amount"].sum()
+        st.line_chart(trend)
+
+        # 📊 Category chart
+        st.subheader("📊 Category Breakdown")
+        cat = df.groupby("cat")["amount"].sum()
+        st.bar_chart(cat)
